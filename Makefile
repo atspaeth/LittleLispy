@@ -1,9 +1,14 @@
 LDFLAGS := 
 CFLAGS := -std=c11
 
+INCDIRS := inc
+INCDIRS := $(foreach dir,$(INCDIRS),-I$(dir))
+
 LIBPATHS :=
 LIBS := 
 LIBS := $(foreach lib,$(LIBS),-l$(lib))
+
+CFLAGS := $(INCDIRS) $(CFLAGS)
 
 TARGET:=$(shell basename $(CURDIR))
 
