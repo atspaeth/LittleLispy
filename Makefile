@@ -1,5 +1,5 @@
 LDFLAGS := 
-CFLAGS := -std=c11
+CFLAGS := -std=c11 -O1
 
 INCDIRS := inc
 INCDIRS := $(foreach dir,$(INCDIRS),-I$(dir))

@@ -76,11 +76,11 @@ symt_find_ll(struct symt *d, key_t k) {
   return ret;
 }
 
-struct symtentry *
-symt_add_at(struct symtentry **place, key_t k, obj_t *val) {
+sym_t *
+symt_add_at(sym_t **place, key_t k, obj_t val) {
   assert(place);
 
-  struct symtentry *ret = malloc(sizeof(*ret));
+  sym_t *ret = malloc(sizeof(*ret));
   if (!ret) die();
 
   hash_t h = hash(k);
@@ -92,21 +92,21 @@ symt_add_at(struct symtentry **place, key_t k, obj_t *val) {
 }
 
 sym_t *
-symt_push(struct symt *d, key_t k, obj_t *val) {
-  struct symtentry **it = symt_find_ll(d,k);
+symt_push(struct symt *d, key_t k, obj_t val) {
+  sym_t **it = symt_find_ll(d,k);
   return symt_add_at(it, k, val);
 }
 
-obj_t *
-symt_rplac(struct symt *d, key_t k, obj_t *val) {
+obj_t
+symt_rplac(struct symt *d, key_t k, obj_t val) {
   sym_t **it = symt_find_ll(d,k);
   if (symt_match(k, 0, *it)) {
-    obj_t *ret = (*it)->val;
+    obj_t ret = (*it)->val;
     (*it)->val = val;
     return ret;
   } else {
     symt_add_at(it, k, val);
-    return NULL;
+    return nil;
   }
 }
 
