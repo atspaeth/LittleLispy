@@ -57,17 +57,57 @@ make_self_evaluating(key_t name) {
   return *place;
 }
 
+obj_t
+funcall(obj_t it, obj_t args) {
+  switch(gettype(it)) {
+  case TYPE_MINT:
+    return nil; // TODO: implement errors
+  case TYPE_SYM:
+    // NYI: call the symbol's function
+    return nil;
+  case TYPE_CFUNC:
+    return as_cfunc(it)(args);
+  case TYPE_CONS:
+    // NYI treat it as a lambda expression
+    return nil;
+  }
+}
+
+obj_t
+eval(obj_t it) {
+  switch(gettype(it)) {
+  case TYPE_SYM:
+    return sym_value(as_sym(it));
+  case TYPE_MINT:
+  case TYPE_CFUNC:
+    return it;
+  case TYPE_CONS:
+    return funcall(as_cons(it)->car, as_cons(it)->cdr);
+  }
+}
+
+obj_t
+plus(obj_t args) {
+  mint_t sum = 0;
+  while (as_sym(args) != as_sym(nil)) {
+    if (!mintp(car(args))) return nil;
+    sum += as_mint(car(args));
+    args = cdr(args);
+  }
+  return make_mint(sum);
+}
 
 int main() {
   symtable = symt_create(128);
   nil = make_sym(make_self_evaluating("nil"));
   t = make_sym(make_self_evaluating("t"));
 
-  bool tworks = sym_value(symt_find(symtable, "t")).sym == t.sym;
-  bool nilworks = sym_value(symt_find(symtable, "nil")).sym == nil.sym;
-
-  if (tworks) puts("T works!");
-  if (nilworks) puts("Nil works!");
+  obj_t x = eval(cons(make_cfunc(plus),
+		      cons(make_mint(2), cons(make_mint(2), nil))));
+  if (mintp(x))
+    printf("2 + 2 = %ld\n", as_mint(x));
+  else
+    puts("x was not a number...");
 
   return 0;
 }
