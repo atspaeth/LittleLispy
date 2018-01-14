@@ -1,7 +1,9 @@
+#include "lisp.h"
 #include "hash.h"
 #include <stdbool.h>
 #include <string.h>
 #include <stdio.h>
+#include <assert.h>
 
 hash_t
 hash(const char *str) {
@@ -16,17 +18,16 @@ hash(const char *str) {
 
 
 void
-dict_print_stats(struct dict *d) {
-  if (!d) return;
+symt_print_stats(struct symt *d) {
   
   size_t nempty = 0;
   size_t ncolls = 0;
   for (size_t i = 0; i < d->nitems; i++) {
-    struct dictentry *it = d->table[i];
+    struct symtentry *it = d->table[i];
     if (!it) nempty++;
     else if (it->next) {
       printf("%s collides with ", it->key);
-      struct dictentry *in = it;
+      struct symtentry *in = it;
       while ((in = in->next)) {
 	if (!in->next) {
 	  if (in == it->next) printf("%s.\n", in->key);
@@ -41,72 +42,84 @@ dict_print_stats(struct dict *d) {
 
 
 
-struct dict *
-dict_create(size_t nitems) {
-  if (nitems & (nitems - 1)) return NULL;
-  struct dict*ret = malloc(sizeof(struct dict)
-			   + sizeof(struct dictentry*[nitems]));
-  if (ret) {
-    ret->nitems = nitems;
-    memset(&ret->table, 0, sizeof(struct dictentry*[nitems]));
-  }
+struct symt *
+symt_create(size_t nitems) {
+  assert((nitems & (nitems - 1)) == 0);
+
+  struct symt *ret = malloc(sizeof(struct symt)
+			    + sizeof(sym_t*[nitems]));
+  if (!ret) die();
+
+  ret->nitems = nitems;
+  memset(&ret->table, 0, sizeof(sym_t*[nitems]));
   return ret;
 }
 
 
 bool
-dict_match(key_t k, hash_t h, struct dictentry *d) {
+symt_match(key_t k, hash_t h, sym_t *d) {
+  if (!h) h = hash(k);
   return d && h == d->hash && !strcmp(k, d->key);
 }
 
-struct dictentry **
-dict_find_ll(struct dict *d, key_t k) {
-  if (!d) return NULL;
+struct symtentry **
+symt_find_ll(struct symt *d, key_t k) {
+  assert(d);
 
   hash_t h = hash(k);
   size_t idx = h & (d->nitems - 1);
 
-  struct dictentry **ret = &d->table[idx];
-  while (*ret && !dict_match(k, h, *ret))
+  struct symtentry **ret = &d->table[idx];
+  while (*ret && !symt_match(k, h, *ret))
     ret = &(*ret)->next;
 
   return ret;
 }
 
-struct dictentry *
-dict_add_at(struct dictentry **place, key_t k, void *val) {
-  if (!place) return NULL;
+struct symtentry *
+symt_add_at(struct symtentry **place, key_t k, obj_t *val) {
+  assert(place);
 
-  struct dictentry *ret = malloc(sizeof(*ret));
-  if (ret) {
-    hash_t h = hash(k);
-    ret->hash = h;
-    ret->key = k;
-    ret->val = val;
-    ret->next = *place;
-  }
+  struct symtentry *ret = malloc(sizeof(*ret));
+  if (!ret) die();
+
+  hash_t h = hash(k);
+  ret->hash = h;
+  ret->key = k;
+  ret->val = val;
+  ret->next = *place;
   return *place = ret;
 }
 
-struct dictentry *
-dict_push(struct dict *d, key_t k, void *val) {
-  struct dictentry **it = dict_find_ll(d,k);
-  return dict_add_at(it, k, val);
+sym_t *
+symt_push(struct symt *d, key_t k, obj_t *val) {
+  struct symtentry **it = symt_find_ll(d,k);
+  return symt_add_at(it, k, val);
 }
 
-struct dictentry *
-dict_find(struct dict *d, key_t k) {
-  struct dictentry **ret = dict_find_ll(d,k);
-  if (!ret) return NULL;
-  return *ret;
+obj_t *
+symt_rplac(struct symt *d, key_t k, obj_t *val) {
+  sym_t **it = symt_find_ll(d,k);
+  if (symt_match(k, 0, *it)) {
+    obj_t *ret = (*it)->val;
+    (*it)->val = val;
+    return ret;
+  } else {
+    symt_add_at(it, k, val);
+    return NULL;
+  }
 }
 
-struct dictentry *
-dict_pop(struct dict *d, key_t k) {
-  struct dictentry **it = dict_find_ll(d, k);
-  if (!it) return NULL;
+sym_t *
+symt_find(struct symt *d, key_t k) {
+  return *symt_find_ll(d,k);
+}
 
-  struct dictentry *ret = *it;
+sym_t *
+symt_pop(struct symt *d, key_t k) {
+  sym_t **it = symt_find_ll(d, k);
+
+  sym_t *ret = *it;
   if (ret)
     *it = ret->next;
   return ret;

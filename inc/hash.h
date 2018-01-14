@@ -12,36 +12,40 @@ hash_t hash(const char *str);
 
 
 
-struct dictentry {
+struct symtentry {
   hash_t hash;
   key_t key;
-  void *val;
+  obj_t *val;
 
-  struct dictentry* next;
+  struct symtentry* next;
 };
 
-struct dict {
+struct symt {
   size_t nitems;
-  struct dictentry *table[0];
+  struct symtentry *table[0];
 };
 
 
 
-// Return a new dictionary with the given number of slots.
+// Return a new symtable with the given number of slots.
 // We will return NULL if the number of slots isn't a power of two! 
-struct dict *dict_create(size_t nitems);
+struct symt *symt_create(size_t nitems);
 
-// Return a key from the dictionary.
-struct dictentry *dict_find(struct dict*, key_t);
+// Return the place where the symtable stores a given key.
+// Intended for low-level implementation.
+sym_t **symt_find_ll(struct symt*, key_t);
 
-// Add a key-value pair to the dictionary, shadowing any existing binding.
-struct dictentry *dict_push(struct dict*, key_t, void*);
+// Return a key from the symtable.
+sym_t *symt_find(struct symt*, key_t);
 
-// Add a key-value pair to the dictionary, replacing any existing binding.
-struct dictentry *dict_rplac(struct dict*, key_t, void*);
+// Add a symbol to the symtable, 
+sym_t *symt_push(struct symt*, key_t, obj_t*);
 
-// Remove and return the first binding of the key from the dictionary.
-struct dictentry *dict_pop(struct dict*, key_t);
+// Add a key-value pair to the symtable, replacing any existing binding.
+obj_t *symt_rplac(struct symt*, key_t, obj_t*);
+
+// Remove and return the first binding of the key from the symtable.
+sym_t *symt_pop(struct symt*, key_t);
 
 
 
