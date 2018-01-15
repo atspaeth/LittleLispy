@@ -46,7 +46,7 @@ cons(obj_t car, obj_t cdr) {
 
 sym_t *
 bind_sym(sym_t *sym, obj_t val) {
-  if (consp(sym->val) || nullp(sym->val))
+  if (consp(sym->val) || eqp(sym->val, nil))
     sym->val = cons(val, sym->val);
   // silently fails if constant. Should it error?
   return sym;
@@ -122,7 +122,7 @@ eval(obj_t it) {
 obj_t
 op_plus(obj_t args) {
   mint_t sum = 0;
-  while (!nullp(args)) {
+  while (!eqp(args, nil)) {
     if (!mintp(car(args))) return nil;
     sum += as_mint(car(args));
     args = cdr(args);
@@ -137,8 +137,54 @@ op_setf(obj_t args) {
 
   // do the assignment
 
-  if (nullp(cdr(cdr(args)))) return val;
+  if (eqp(cdr(cdr(args)), nil)) return val;
   else return op_setf(cdr(cdr(args)));
+}
+
+obj_t
+op_equal(obj_t args) {
+  obj_t item = car(args);
+  while (!eqp(args = cdr(args), nil)) {
+    if (!eqp(car(args), item))
+      return nil;
+  }
+  return t;
+}
+
+obj_t
+op_if(obj_t args) {
+  obj_t cond = car(args);
+  obj_t thn = car(cdr(args));
+  obj_t els = car(cdr(cdr(args)));
+  if (!eqp(eval(cond), nil))
+    return eval(thn);
+  else
+    return eval(els);
+}
+
+obj_t
+printy(obj_t arg) {
+  switch (gettype(arg)) {
+  case TYPE_MINT:
+    printf("%ld", as_mint(arg)); break;
+  case TYPE_SYM:
+    printf("%s", as_sym(arg)->key); break;
+  case TYPE_FUNC:
+    printf("<function>"); break;
+  case TYPE_CONS:
+    putchar('(');
+    printy(car(arg));
+    while (consp(arg = cdr(arg))) {
+      putchar(' ');
+      printy(car(arg));
+    }
+    if (!eqp(arg, nil)) {
+      printf(" . ");
+      printy(arg);
+    }
+    putchar(')');
+  }
+  return nil;
 }
 
 int main() {
@@ -147,13 +193,23 @@ int main() {
   t = make_sym(make_self_evaluating("t"));
   func_t plusfun = {make_compiled(&op_plus)};
   obj_t plus = make_sym(bind_name("+", make_func(&plusfun)));
+  func_t iffun = {make_special(&op_if)};
+  obj_t iff = make_sym(bind_name("if", make_func(&iffun)));
+  func_t equalfun = {make_compiled(&op_equal)};
+  obj_t equal = make_sym(bind_name("=", make_func(&equalfun)));
+  
 
-  obj_t x = eval(cons(plus,
-		      cons(make_mint(2), cons(make_mint(2), nil))));
-  if (mintp(x))
-    printf("2 + 2 = %ld\n", as_mint(x));
-  else
-    puts("x was not a number...");
+  obj_t code = cons(iff,
+		    cons(cons(equal,
+			      cons(cons(plus,
+					cons(make_mint(2),
+					     cons(make_mint(2), nil))),
+				   cons(make_mint(5), nil))),
+			 cons(make_mint(42),
+			      cons(make_mint(-1), nil))));
+  printy(code);
+  putchar('\n');
+  printy(eval(code));
 
   return 0;
 }

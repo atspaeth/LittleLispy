@@ -119,8 +119,8 @@ static inline obj_t make_mint(long mint) {
 // The absolute basics...
 extern obj_t nil;
 extern obj_t t;
-static inline bool nullp(obj_t obj) {
-  return as_sym(obj) == as_sym(nil);}
+static inline bool eqp(obj_t a, obj_t b) {
+  return a.mint == b.mint;}
 
 obj_t cons(obj_t car, obj_t cdr);
 obj_t car(obj_t cons);
