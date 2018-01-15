@@ -2,6 +2,7 @@
 #define LISP_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 enum type {
   TYPE_MINT=0,
@@ -24,6 +25,7 @@ typedef struct func func_t;
 
 typedef union obj {
   intptr_t tag;
+  uintptr_t _bits;
   cons_t *cons;
   mint_t mint;
   sym_t *sym;
@@ -115,17 +117,26 @@ static inline obj_t make_func(func_t *func) {
 static inline obj_t make_mint(long mint) {
   return (obj_t)((mint << 2) | TYPE_MINT);}
 
-
-// The absolute basics...
+// Predicates.
 extern obj_t nil;
-extern obj_t t;
 static inline bool eqp(obj_t a, obj_t b) {
-  return a.mint == b.mint;}
+  return a._bits == b._bits;}
+static inline bool nullp(obj_t a) {
+  return a._bits == nil._bits;}
 
 obj_t cons(obj_t car, obj_t cdr);
 obj_t car(obj_t cons);
 obj_t cdr(obj_t cons);
 obj_t eval(obj_t);
+
+
+// Manipulate the symbol table.
+sym_t *bind_sym(sym_t *sym, obj_t val);
+sym_t *unbind_sym(sym_t *sym);
+sym_t *make_const(const char *name, obj_t val);
+obj_t name_value(const char *name);
+obj_t sym_value(sym_t *sym);
+sym_t *intern_name(const char *name);
 
 
 

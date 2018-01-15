@@ -100,7 +100,7 @@ symt_push(struct symt *d, key_t k, obj_t val) {
 obj_t
 symt_rplac(struct symt *d, key_t k, obj_t val) {
   sym_t **it = symt_find_ll(d,k);
-  if (symt_match(k, 0, *it)) {
+  if (*it) {
     obj_t ret = (*it)->val;
     (*it)->val = val;
     return ret;

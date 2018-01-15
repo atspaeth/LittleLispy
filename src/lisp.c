@@ -5,6 +5,7 @@
 
 #include "lisp.h"
 #include "hash.h"
+#include "builtins.h"
 
 // nil will be redefined in init code, but some of that code depends
 //  on nil having some (any) value; the mint 0 has been chosen arbitrarily
@@ -34,6 +35,11 @@ sym_value(sym_t *sym) {
   } else return nil;
 }
 
+obj_t
+name_value(key_t name) {
+  return sym_value(intern_name(name));
+}
+
 obj_t 
 cons(obj_t car, obj_t cdr) {
   cons_t *cons = malloc(sizeof(cons_t));
@@ -46,9 +52,21 @@ cons(obj_t car, obj_t cdr) {
 
 sym_t *
 bind_sym(sym_t *sym, obj_t val) {
-  if (consp(sym->val) || eqp(sym->val, nil))
+
+  // prevent assigning to nil
+  if (nullp(make_sym(sym))) return as_sym(nil);
+
+  // prevent assigning to constants
+  if (consp(sym->val) || nullp(sym->val))
     sym->val = cons(val, sym->val);
-  // silently fails if constant. Should it error?
+
+  return sym;
+}
+
+sym_t *
+unbind_sym(sym_t *sym) {
+  if (consp(sym->val))
+    sym->val = cdr(sym->val);
   return sym;
 }
 
@@ -65,19 +83,50 @@ bind_name(key_t name, obj_t val) {
 }
 
 sym_t *
+make_const(key_t name, obj_t val) {
+  sym_t *ret = intern_name(name);
+  ret->val = val;
+  return ret;
+}
+
+sym_t *
 make_self_evaluating(key_t name) {
   sym_t *ret = intern_name(name);
   ret->val = make_sym(ret);
   return ret;
 }
 
+void
+bind_list(obj_t names, obj_t args) {
+  while (consp(names) && consp(args)) {
+    if (symp(car(names)))
+      bind_sym(as_sym(car(names)), car(args));
+    names = cdr(names);
+    args = cdr(args);
+  }
+}
+
+void
+unbind_list(obj_t names) {
+  while (consp(names)) {
+    if (symp(car(names)))
+      unbind_sym(as_sym(car(names)));
+    names = cdr(names);
+  }
+}
+
 obj_t
 interpret_function(cons_t *lam, obj_t args, bool eval_first) {
-  // TODO: bind each argument in turn and eval the lambda list,
-  //   then pop all the newly-created bindings.
   obj_t parlist = lam->car;
   obj_t body = lam->cdr;
-  return nil;
+
+  bind_list(parlist, args);
+
+  obj_t ret = eval(body);
+
+  unbind_list(parlist);
+
+  return ret;
 }
 
 obj_t
@@ -120,49 +169,6 @@ eval(obj_t it) {
 }
 
 obj_t
-op_plus(obj_t args) {
-  mint_t sum = 0;
-  while (!eqp(args, nil)) {
-    if (!mintp(car(args))) return nil;
-    sum += as_mint(car(args));
-    args = cdr(args);
-  }
-  return make_mint(sum);
-}
-
-obj_t
-op_setf(obj_t args) {
-  obj_t name = car(args);
-  obj_t val = car(cdr(args));
-
-  // do the assignment
-
-  if (eqp(cdr(cdr(args)), nil)) return val;
-  else return op_setf(cdr(cdr(args)));
-}
-
-obj_t
-op_equal(obj_t args) {
-  obj_t item = car(args);
-  while (!eqp(args = cdr(args), nil)) {
-    if (!eqp(car(args), item))
-      return nil;
-  }
-  return t;
-}
-
-obj_t
-op_if(obj_t args) {
-  obj_t cond = car(args);
-  obj_t thn = car(cdr(args));
-  obj_t els = car(cdr(cdr(args)));
-  if (!eqp(eval(cond), nil))
-    return eval(thn);
-  else
-    return eval(els);
-}
-
-obj_t
 printy(obj_t arg) {
   switch (gettype(arg)) {
   case TYPE_MINT:
@@ -178,7 +184,7 @@ printy(obj_t arg) {
       putchar(' ');
       printy(car(arg));
     }
-    if (!eqp(arg, nil)) {
+    if (!nullp(arg)) {
       printf(" . ");
       printy(arg);
     }
@@ -191,27 +197,53 @@ int main() {
   symtable = symt_create(128);
   nil = make_sym(make_self_evaluating("nil"));
   t = make_sym(make_self_evaluating("t"));
-  func_t plusfun = {make_compiled(&op_plus)};
-  obj_t plus = make_sym(bind_name("+", make_func(&plusfun)));
-  func_t iffun = {make_special(&op_if)};
-  obj_t iff = make_sym(bind_name("if", make_func(&iffun)));
-  func_t equalfun = {make_compiled(&op_equal)};
-  obj_t equal = make_sym(bind_name("=", make_func(&equalfun)));
-  
 
+  func_t plusfun = {make_compiled(&fn_add)};
+  obj_t plus = make_sym(make_const("+", make_func(&plusfun)));
+
+  func_t iffun = {make_special(&op_if)};
+  obj_t iff = make_sym(make_const("if", make_func(&iffun)));
+
+  func_t equalfun = {make_compiled(&fn_equal)};
+  obj_t equal = make_sym(make_const("=", make_func(&equalfun)));
+
+  func_t setfun = {make_special(&op_set)};
+  obj_t set = make_sym(make_const("set", make_func(&setfun)));
+
+  obj_t x = make_sym(intern_name("x"));
+  
+  obj_t asg = cons(set, cons(x, cons(make_mint(42), nil)));
   obj_t code = cons(iff,
 		    cons(cons(equal,
 			      cons(cons(plus,
-					cons(make_mint(2),
-					     cons(make_mint(2), nil))),
-				   cons(make_mint(5), nil))),
-			 cons(make_mint(42),
-			      cons(make_mint(-1), nil))));
+					cons(x,
+					     cons(make_mint(-38), nil))),
+				   cons(make_mint(4), nil))),
+			 cons(cons(set,
+				   cons(x,
+					cons(cons(plus,
+						  cons(x,
+						       cons(make_mint(-1),
+							    nil))), nil))),
+			      cons(cons(set,
+					cons(x,
+					     cons(make_mint(-1), nil))),
+				   nil))));
+  printy(asg);
+  putchar('\n');
   printy(code);
   putchar('\n');
+
+  eval(asg);
   printy(eval(code));
+  putchar('\n');
 
   return 0;
+}
+
+void error(const char *err) {
+  fputs(err, stderr);
+  abort();
 }
 
 void die() {

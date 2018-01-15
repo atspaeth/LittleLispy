@@ -45,3 +45,5 @@ $(BLD):
 $(BLD)/%.c.o: %.c
 	@echo Compiling $(notdir $<)...
 	@clang -MMD -MP -MF $(BLD)/$*.d $(CFLAGS) -c $< -o $@
+
+-include $(BLD)/*.d
