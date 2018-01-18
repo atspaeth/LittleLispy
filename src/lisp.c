@@ -3,6 +3,7 @@
 #include <ctype.h>
 #include <stdbool.h>
 
+#include <setjmp.h>
 #include "lisp.h"
 #include "hash.h"
 #include "builtins.h"
@@ -193,6 +194,69 @@ printy(obj_t arg) {
   return nil;
 }
 
+obj_t read(FILE *in);
+
+obj_t
+read_cons(FILE *in) {
+  int c;
+  while (isspace(c = fgetc(in)));
+  if (c == ')') return nil;
+  ungetc(c, in);
+
+  return cons(read(in), read_cons(in));
+}
+
+char *
+gets_until(FILE *in, bool(*pred)(char)) {
+  int c;
+  size_t size=8, len=0;
+  char *buf = malloc(size);
+
+  while ((c = fgetc(in)) != EOF && !pred(buf[len] = c))
+    if (++len == size) {
+      buf = realloc(buf, size *= 2);
+      if (!buf) return NULL;
+    }
+  buf[len] = 0;
+  if (c != EOF) ungetc(c, in);
+
+  return buf;
+}
+
+
+bool
+is_terminating(char c) {
+  return c=='(' || c==')' || c==',' || isspace(c);
+}
+
+obj_t
+read_mint(char *str) {
+  char *endptr = str;
+  mint_t x = strtol(str, &endptr, 0);
+  if (!*endptr) return make_mint(x);
+  else return nil;
+}
+
+obj_t
+read(FILE *in) {
+  int c;
+
+  while (isspace(c = fgetc(in)));
+
+  if (c == EOF) return nil;
+  if (c == '(') return read_cons(in);
+  ungetc(c, in);
+
+  // otherwise, read a symbol or number:
+  //  collect characters into a string until a terminating
+  //  character, i.e. " ,)" is found, then determine if it
+  //  could be a number; if not, make it an atom
+  char *tok = gets_until(in, is_terminating);
+  obj_t it = read_mint(tok);
+  if (!nullp(it)) return it;
+  else return make_sym(intern_name(tok));
+}
+
 int main() {
   symtable = symt_create(128);
   nil = make_sym(make_self_evaluating("nil"));
@@ -238,12 +302,14 @@ int main() {
   printy(eval(code));
   putchar('\n');
 
-  return 0;
-}
+  x = nil;
+  do {
+    x = read(stdin);
+    printy(eval(x));
+    putchar('\n');
+  } while (!nullp(x));
 
-void error(const char *err) {
-  fputs(err, stderr);
-  abort();
+  return 0;
 }
 
 void die() {
