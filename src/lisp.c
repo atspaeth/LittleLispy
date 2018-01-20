@@ -14,6 +14,7 @@ typedef enum {
   E_NO_FUNCTION,
   E_END_OF_FILE,
   E_READ_ERROR,
+  E_WRONG_ARGCOUNT,
   E_INVALID_ARG,
 } error_t;
 
@@ -109,6 +110,15 @@ make_self_evaluating(key_t name) {
 }
 
 void
+unbind_list(obj_t names) {
+  while (consp(names)) {
+    if (symp(car(names)))
+      unbind_sym(as_sym(car(names)));
+    names = cdr(names);
+  }
+}
+
+void
 bind_list(obj_t names, obj_t args) {
   while (consp(names) && consp(args)) {
     if (symp(car(names)))
@@ -116,15 +126,18 @@ bind_list(obj_t names, obj_t args) {
     names = cdr(names);
     args = cdr(args);
   }
+  if (consp(names) || consp(args)) {
+    unbind_list(names);
+    error(E_WRONG_ARGCOUNT, nil);
+  }
 }
 
-void
-unbind_list(obj_t names) {
-  while (consp(names)) {
-    if (symp(car(names)))
-      unbind_sym(as_sym(car(names)));
-    names = cdr(names);
-  }
+obj_t
+eval_list(obj_t list) {
+  if (!consp(list))
+    return nil;
+  else
+    return cons(eval(car(list)), eval_list(cdr(list)));
 }
 
 obj_t
@@ -134,19 +147,15 @@ interpret_function(cons_t *lam, obj_t args, bool eval_first) {
 
   bind_list(parlist, args);
 
-  obj_t ret = eval(body);
+  obj_t ret = nil;
+  do {
+    ret = eval(car(body));
+    body = cdr(body);
+  } while (consp(body));
 
   unbind_list(parlist);
 
   return ret;
-}
-
-obj_t
-eval_list(obj_t list) {
-  if (!consp(list))
-    return nil;
-  else
-    return cons(eval(car(list)), eval_list(cdr(list)));
 }
 
 obj_t
@@ -274,6 +283,7 @@ int main() {
   nil = make_sym(make_self_evaluating("nil"));
   t = make_sym(make_self_evaluating("t"));
 
+  // set up all the builtins.....
   func_t plusfun = {make_compiled(&fn_add)};
   obj_t plus = make_sym(make_const("+", make_func(&plusfun)));
 
@@ -285,6 +295,9 @@ int main() {
 
   func_t setfun = {make_special(&op_set)};
   obj_t set = make_sym(make_const("set", make_func(&setfun)));
+
+  func_t lambdaform = {make_special(&op_lambda)};
+  obj_t lambda = make_sym(make_const("lambda", make_func(&lambdaform)));
 
   int ecode = setjmp(errhandler);
   if (ecode == 0 || ecode == E_TRY_AGAIN) {
@@ -312,6 +325,9 @@ int main() {
       printf("* INVALID ARGUMENT: ");
       printy(errobj);
       putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_WRONG_ARGCOUNT:
+      puts("* WRONG NUMBER OF ARGUMENTS");
       longjmp(errhandler, E_TRY_AGAIN);
     default:
       puts("* BUG! ILLEGAL ERROR");
