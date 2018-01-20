@@ -8,6 +8,17 @@
 #include "hash.h"
 #include "builtins.h"
 
+typedef enum {
+  E_TRY_AGAIN=1,
+  E_UNDECLARED,
+  E_NO_FUNCTION,
+  E_END_OF_FILE,
+  E_READ_ERROR,
+  E_INVALID_ARG,
+} error_t;
+
+void error(error_t, obj_t);
+
 // nil will be redefined in init code, but some of that code depends
 //  on nil having some (any) value; the mint 0 has been chosen arbitrarily
 obj_t nil=(obj_t)0L, t;
@@ -140,7 +151,7 @@ eval_list(obj_t list) {
 
 obj_t
 funcall(obj_t it, obj_t args) {
-  if (!funcp(it)) return nil; // TODO: implement errors!
+  if (!funcp(it)) error(E_NO_FUNCTION, it);
 
   func_t *f = as_func(it);
   
@@ -243,19 +254,20 @@ read(FILE *in) {
 
   while (isspace(c = fgetc(in)));
 
-  if (c == EOF) return nil;
+  if (c == EOF) error(E_END_OF_FILE, nil);
+  if (c == ')') error(E_READ_ERROR, nil);
   if (c == '(') return read_cons(in);
   ungetc(c, in);
 
-  // otherwise, read a symbol or number:
-  //  collect characters into a string until a terminating
-  //  character, i.e. " ,)" is found, then determine if it
-  //  could be a number; if not, make it an atom
   char *tok = gets_until(in, is_terminating);
   obj_t it = read_mint(tok);
   if (!nullp(it)) return it;
   else return make_sym(intern_name(tok));
 }
+
+
+jmp_buf errhandler;
+obj_t errobj;
 
 int main() {
   symtable = symt_create(128);
@@ -274,42 +286,44 @@ int main() {
   func_t setfun = {make_special(&op_set)};
   obj_t set = make_sym(make_const("set", make_func(&setfun)));
 
-  obj_t x = make_sym(intern_name("x"));
-  
-  obj_t asg = cons(set, cons(x, cons(make_mint(42), nil)));
-  obj_t code = cons(iff,
-		    cons(cons(equal,
-			      cons(cons(plus,
-					cons(x,
-					     cons(make_mint(-38), nil))),
-				   cons(make_mint(4), nil))),
-			 cons(cons(set,
-				   cons(x,
-					cons(cons(plus,
-						  cons(x,
-						       cons(make_mint(-1),
-							    nil))), nil))),
-			      cons(cons(set,
-					cons(x,
-					     cons(make_mint(-1), nil))),
-				   nil))));
-  printy(asg);
-  putchar('\n');
-  printy(code);
-  putchar('\n');
+  int ecode = setjmp(errhandler);
+  if (ecode == 0 || ecode == E_TRY_AGAIN) {
+    while(1) {
+      printy(eval(read(stdin)));
+      putchar('\n');
+    }
+  } else switch(ecode) {
+    case E_READ_ERROR:
+      puts("* READ ERROR");
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_END_OF_FILE:
+      exit(0);
+    case E_NO_FUNCTION:
+      printf("* UNDEFINED FUNCTION: ");
+      printy(errobj);
+      putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_UNDECLARED:
+      printf("* UNDECLARED VARIABLE: ");
+      printy(errobj);
+      putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_INVALID_ARG:
+      printf("* INVALID ARGUMENT: ");
+      printy(errobj);
+      putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    default:
+      puts("* BUG! ILLEGAL ERROR");
+      exit(1);
+    }
 
-  eval(asg);
-  printy(eval(code));
-  putchar('\n');
+  exit(1);
+}
 
-  x = nil;
-  do {
-    x = read(stdin);
-    printy(eval(x));
-    putchar('\n');
-  } while (!nullp(x));
-
-  return 0;
+void error(error_t ecode, obj_t eobj) {
+  errobj = eobj;
+  longjmp(errhandler, ecode);
 }
 
 void die() {
