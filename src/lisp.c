@@ -110,13 +110,16 @@ unbind_list(obj_t names) {
 }
 
 void
-bind_list(obj_t names, obj_t args) {
+bind_list(obj_t names, obj_t args, bool eval_first) {
   while (consp(names) && consp(args)) {
-    if (symp(car(names)))
-      bind_sym(as_sym(car(names)), car(args));
+    obj_t name = car(names);
+    obj_t arg = car(args);
+    if (symp(name))
+      bind_sym(as_sym(name), eval_first? eval(arg) : arg);
     names = cdr(names);
     args = cdr(args);
   }
+
   if (consp(names) || consp(args)) {
     unbind_list(names);
     error(E_WRONG_ARGCOUNT, nil);
@@ -136,7 +139,7 @@ interpret_function(cons_t *lam, obj_t args, bool eval_first) {
   obj_t parlist = lam->car;
   obj_t body = lam->cdr;
 
-  bind_list(parlist, args);
+  bind_list(parlist, args, eval_first);
 
   obj_t ret = nil;
   do {
@@ -306,7 +309,9 @@ int main() {
       putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
     case E_WRONG_ARGCOUNT:
-      puts("* WRONG NUMBER OF ARGUMENTS");
+      printf("* WRONG NUMBER OF ARGUMENTS: ");
+      printy(errobj);
+      putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
     default:
       puts("* BUG! ILLEGAL ERROR");
