@@ -30,7 +30,8 @@ void
 setup_builtins() {
   create_special_form("if", &op_if);
   create_special_form("quote", &op_quote);
-  create_special_form("\\", &op_lambda);
+  create_special_form("lambda", &op_lambda);
+  create_special_form("mu", &op_mu);
   create_special_form("set", &op_set);
 
   create_builtin("=", &fn_equal);
@@ -67,6 +68,13 @@ op_if(obj_t args) {
 obj_t
 op_quote(obj_t args) {
   return car(args);
+}
+
+obj_t
+op_mu(obj_t args) {
+  func_t *fun = malloc(sizeof(func_t));
+  fun->f = make_macro(as_cons(args));
+  return make_func(fun);
 }
 
 obj_t

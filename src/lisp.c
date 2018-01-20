@@ -33,7 +33,7 @@ sym_value(sym_t *sym) {
   if (consp(val))
     return car(val);
 
-  if (nullp(val) && sym != nil.sym)
+  if (nullp(val) && !nullp(make_sym(sym)))
     error(E_UNDECLARED, make_sym(sym));
 
   return val;
