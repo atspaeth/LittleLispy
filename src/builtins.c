@@ -33,6 +33,7 @@ setup_builtins() {
   create_special_form("lambda", &op_lambda);
   create_special_form("mu", &op_mu);
   create_special_form("set", &op_set);
+  create_special_form("do", &op_do);
 
   create_builtin("=", &fn_equal);
   create_builtin("cons?", &fn_consp);
@@ -50,8 +51,71 @@ setup_builtins() {
   create_builtin("cons", &fn_cons);
   create_builtin("car", &fn_car);
   create_builtin("cdr", &fn_cdr);
+
+  create_builtin("err", &fn_error);
+  create_builtin("print", &fn_print);
+  create_builtin("eval", &fn_eval);
+  create_builtin("apply", &fn_apply);
 }
 
+obj_t
+fn_eval(obj_t args) {
+  obj_t ret = nil;
+  while (consp(args)) {
+    ret = eval(car(args));
+    args = cdr(args);
+  }
+  return ret;
+}
+
+
+obj_t
+dottify(obj_t args) {
+  if (!consp(cdr(args))) return car(args);
+  return cons(car(args), dottify(cdr(args)));
+}
+
+obj_t interpret_function(cons_t*, obj_t, bool);
+obj_t
+fn_apply(obj_t args) {
+  obj_t fun = car(args);
+  args = dottify(cdr(args));
+
+  if (!funcp(fun)) error(E_NO_FUNCTION, fun);
+  func_t *f = as_func(fun);
+  switch (getftype(f)) {
+  case FTYPE_COMPILED:
+    return as_compiled(f)(args);
+  case FTYPE_INTERP:
+    return interpret_function(as_interp(f), args, false);
+  default:
+    error(E_INVALID_ARG, fun);
+    return nil;
+  }
+}
+
+
+void printy(obj_t);
+obj_t
+fn_print(obj_t args) {
+  while (consp(args)) {
+    printy(car(args));
+    args = cdr(args);
+  }
+  if (!nullp(args)) printy(args);
+  return nil;
+}
+
+
+obj_t
+op_do(obj_t args) {
+  obj_t ret = nil;
+  while (consp(args)) {
+    ret = eval(car(args));
+    args = cdr(args);
+  }
+  return ret;
+}
 
 obj_t
 op_if(obj_t args) {
@@ -75,6 +139,13 @@ op_mu(obj_t args) {
   func_t *fun = malloc(sizeof(func_t));
   fun->f = make_macro(as_cons(args));
   return make_func(fun);
+}
+
+obj_t
+fn_error(obj_t args) {
+  error(E_RUNTIMEY, args);
+  // unreachable
+  return nil;
 }
 
 obj_t
@@ -223,6 +294,13 @@ fn_symp(obj_t args) {
 }
 
 obj_t
-fn_list(obj_t args) {
+copy_list(obj_t args) {
+  if (consp(args))
+    return cons(car(args), copy_list(cdr(args)));
   return args;
+}
+
+obj_t
+fn_list(obj_t args) {
+  return copy_list(args);
 }

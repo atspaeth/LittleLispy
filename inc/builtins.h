@@ -9,7 +9,8 @@ extern obj_t nil, t;
 typedef obj_t builtin_t(obj_t);
 
 // Special forms
-builtin_t op_if, op_quote, op_lambda, op_mu, op_set, op_let;
+builtin_t op_if, op_quote, op_lambda, op_mu, op_do;
+builtin_t op_set, op_rplaca, op_rplacd;
 
 // The basic predicates
 builtin_t fn_consp, fn_nullp, fn_symp, fn_mintp, fn_funp, fn_equal;
@@ -20,8 +21,8 @@ builtin_t fn_add, fn_mul, fn_sub, fn_div, fn_mod;
 // List functions
 builtin_t fn_list, fn_cons, fn_car, fn_cdr;
 
-// The REPL
-builtin_t op_read, op_eval, op_print;
+// Little bits of magic
+builtin_t fn_error, fn_eval, fn_print, fn_apply;
 
 
 void setup_builtins(void);

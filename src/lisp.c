@@ -107,23 +107,8 @@ unbind_list(obj_t names) {
       unbind_sym(as_sym(car(names)));
     names = cdr(names);
   }
-}
-
-void
-bind_list(obj_t names, obj_t args, bool eval_first) {
-  while (consp(names) && consp(args)) {
-    obj_t name = car(names);
-    obj_t arg = car(args);
-    if (symp(name))
-      bind_sym(as_sym(name), eval_first? eval(arg) : arg);
-    names = cdr(names);
-    args = cdr(args);
-  }
-
-  if (consp(names) || consp(args)) {
-    unbind_list(names);
-    error(E_WRONG_ARGCOUNT, nil);
-  }
+  if (!nullp(names))
+    unbind_sym(as_sym(names));
 }
 
 obj_t
@@ -132,6 +117,39 @@ eval_list(obj_t list) {
     return nil;
   else
     return cons(eval(car(list)), eval_list(cdr(list)));
+}
+
+void
+bind_list(obj_t names, obj_t args, bool eval_first) {
+  size_t argcount = 0;
+  while (consp(names) && consp(args)) {
+    obj_t name = car(names);
+    obj_t arg = car(args);
+    if (symp(name))
+      bind_sym(as_sym(name),
+	       eval_first? eval(arg) : arg);
+    names = cdr(names);
+    args = cdr(args);
+    argcount ++;
+  }
+
+  if (consp(args) && symp(names) && !nullp(names)) {
+    bind_sym(as_sym(names),
+	     eval_first? eval_list(args) : args);
+
+  }
+
+  if (consp(args) || consp(names)) {
+    while (consp(args)) {
+	argcount ++;
+	args = cdr(args);
+    }
+
+    if (consp(names)) {
+	unbind_list(names);
+	error(E_WRONG_ARGCOUNT, make_mint(argcount));
+    }
+  }
 }
 
 obj_t
@@ -215,9 +233,16 @@ read_cons(FILE *in) {
   int c;
   while (isspace(c = fgetc(in)));
   if (c == ')') return nil;
-  ungetc(c, in);
-
-  return cons(read(in), read_cons(in));
+  if (c == '.') {
+    obj_t ret = read(in);
+    while (isspace(c = fgetc(in)));
+    if (c != ')')
+      error(E_READ_ERROR, nil);
+    return ret;
+  } else {
+    ungetc(c, in);
+    return cons(read(in), read_cons(in));
+  }
 }
 
 char *
@@ -310,6 +335,11 @@ int main() {
       longjmp(errhandler, E_TRY_AGAIN);
     case E_WRONG_ARGCOUNT:
       printf("* WRONG NUMBER OF ARGUMENTS: ");
+      printy(errobj);
+      putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_RUNTIMEY:
+      printf("* RUNTIME ERROR: ");
       printy(errobj);
       putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
