@@ -8,18 +8,6 @@
 #include "hash.h"
 #include "builtins.h"
 
-typedef enum {
-  E_TRY_AGAIN=1,
-  E_UNDECLARED,
-  E_NO_FUNCTION,
-  E_END_OF_FILE,
-  E_READ_ERROR,
-  E_WRONG_ARGCOUNT,
-  E_INVALID_ARG,
-} error_t;
-
-void error(error_t, obj_t);
-
 // nil will be redefined in init code, but some of that code depends
 //  on nil having some (any) value; the mint 0 has been chosen arbitrarily
 obj_t nil=(obj_t)0L, t;
@@ -41,11 +29,14 @@ cdr(obj_t cons) {
 
 obj_t 
 sym_value(sym_t *sym) {
-  if (sym) {
-    if (consp(sym->val))
-      return car(sym->val);
-    else return sym->val;
-  } else return nil;
+  obj_t val = sym->val;
+  if (consp(val))
+    return car(val);
+
+  if (nullp(val) && sym != nil.sym)
+    error(E_UNDECLARED, make_sym(sym));
+
+  return val;
 }
 
 obj_t
@@ -266,8 +257,10 @@ read(FILE *in) {
   if (c == EOF) error(E_END_OF_FILE, nil);
   if (c == ')') error(E_READ_ERROR, nil);
   if (c == '(') return read_cons(in);
-  ungetc(c, in);
+  if (c == '\'')
+    return cons(make_sym(intern_name("quote")), cons(read(in), nil));
 
+  ungetc(c, in);
   char *tok = gets_until(in, is_terminating);
   obj_t it = read_mint(tok);
   if (!nullp(it)) return it;
@@ -283,21 +276,7 @@ int main() {
   nil = make_sym(make_self_evaluating("nil"));
   t = make_sym(make_self_evaluating("t"));
 
-  // set up all the builtins.....
-  func_t plusfun = {make_compiled(&fn_add)};
-  obj_t plus = make_sym(make_const("+", make_func(&plusfun)));
-
-  func_t iffun = {make_special(&op_if)};
-  obj_t iff = make_sym(make_const("if", make_func(&iffun)));
-
-  func_t equalfun = {make_compiled(&fn_equal)};
-  obj_t equal = make_sym(make_const("=", make_func(&equalfun)));
-
-  func_t setfun = {make_special(&op_set)};
-  obj_t set = make_sym(make_const("set", make_func(&setfun)));
-
-  func_t lambdaform = {make_special(&op_lambda)};
-  obj_t lambda = make_sym(make_const("lambda", make_func(&lambdaform)));
+  setup_builtins();
 
   int ecode = setjmp(errhandler);
   if (ecode == 0 || ecode == E_TRY_AGAIN) {
@@ -337,12 +316,14 @@ int main() {
   exit(1);
 }
 
-void error(error_t ecode, obj_t eobj) {
+void
+error(error_t ecode, obj_t eobj) {
   errobj = eobj;
   longjmp(errhandler, ecode);
 }
 
-void die() {
+void
+die() {
   perror(NULL);
   abort();
 }

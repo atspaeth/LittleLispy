@@ -141,6 +141,18 @@ sym_t *intern_name(const char *name);
 
 
 // General utility.
+typedef enum {
+  E_TRY_AGAIN=1,
+  E_UNDECLARED,
+  E_NO_FUNCTION,
+  E_END_OF_FILE,
+  E_READ_ERROR,
+  E_WRONG_ARGCOUNT,
+  E_INVALID_ARG,
+} error_t;
+
+void error(error_t, obj_t);
+
 void die(void);
 
 #endif // LISP_H

@@ -12,10 +12,10 @@ typedef obj_t builtin_t(obj_t);
 builtin_t op_if, op_quote, op_lambda, op_mu, op_set, op_let;
 
 // The basic predicates
-builtin_t fn_consp, fn_symp, fn_mintp, fn_funp, fn_equal;
+builtin_t fn_consp, fn_nullp, fn_symp, fn_mintp, fn_funp, fn_equal;
 
 // Arithmetic functions
-builtin_t fn_add, fn_mul, fn_sub, fn_div;
+builtin_t fn_add, fn_mul, fn_sub, fn_div, fn_mod;
 
 // List functions
 builtin_t fn_list, fn_cons, fn_car, fn_cdr;
@@ -23,6 +23,8 @@ builtin_t fn_list, fn_cons, fn_car, fn_cdr;
 // The REPL
 builtin_t op_read, op_eval, op_print;
 
+
+void setup_builtins(void);
 
 
 
