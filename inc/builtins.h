@@ -9,11 +9,14 @@ extern obj_t nil, t;
 typedef obj_t builtin_t(obj_t);
 
 // Special forms
-builtin_t op_if, op_quote, op_lambda, op_mu, op_do;
+builtin_t op_cond, op_if, op_quote, op_lambda, op_mu, op_do;
 builtin_t op_set, op_rplaca, op_rplacd;
+builtin_t op_and, op_or, op_nand, op_nor;
 
 // The basic predicates
-builtin_t fn_consp, fn_nullp, fn_symp, fn_mintp, fn_funp, fn_equal;
+builtin_t fn_consp, fn_nullp, fn_symp, fn_mintp, fn_funp;
+builtin_t fn_less, fn_greater, fn_lesseq, fn_greatereq;
+builtin_t fn_equal, fn_notequal;
 
 // Arithmetic functions
 builtin_t fn_add, fn_mul, fn_sub, fn_div, fn_mod;

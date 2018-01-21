@@ -298,6 +298,7 @@ read(FILE *in) {
 
 jmp_buf errhandler;
 obj_t errobj;
+bool did_autoload = false;
 
 int main() {
   symtable = symt_create(128);
@@ -306,9 +307,16 @@ int main() {
 
   setup_builtins();
 
+  FILE *autoload = fopen("autoload.lisp", "r");
+  if (!autoload) did_autoload = true;
+
   int ecode = setjmp(errhandler);
   if (ecode == 0 || ecode == E_TRY_AGAIN) {
+    while(!did_autoload) {
+      eval(read(autoload));
+    }
     while(1) {
+      printf("> ");
       printy(eval(read(stdin)));
       putchar('\n');
     }
@@ -317,7 +325,12 @@ int main() {
       puts("* READ ERROR");
       longjmp(errhandler, E_TRY_AGAIN);
     case E_END_OF_FILE:
-      exit(0);
+      if (did_autoload) 
+	exit(0);
+      else {
+	did_autoload = true;
+	longjmp(errhandler, E_TRY_AGAIN);
+      }
     case E_NO_FUNCTION:
       printf("* UNDEFINED FUNCTION: ");
       printy(errobj);
@@ -340,7 +353,11 @@ int main() {
       longjmp(errhandler, E_TRY_AGAIN);
     case E_RUNTIMEY:
       printf("* RUNTIME ERROR: ");
-      printy(errobj);
+      while (consp(errobj)) {
+	printy(car(errobj));
+	putchar(' ');
+	errobj = cdr(errobj);
+      }
       putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
     default:

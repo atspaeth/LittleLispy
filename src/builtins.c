@@ -28,14 +28,24 @@ create_special_form(const char *name, builtin_t *func) {
 
 void
 setup_builtins() {
+  create_special_form("cond", &op_cond);
   create_special_form("if", &op_if);
   create_special_form("quote", &op_quote);
   create_special_form("lambda", &op_lambda);
   create_special_form("mu", &op_mu);
   create_special_form("set", &op_set);
   create_special_form("do", &op_do);
+  create_special_form("and", &op_and);
+  create_special_form("or", &op_or);
+  create_special_form("nand", &op_nand);
+  create_special_form("nor", &op_nor);
 
+  create_builtin("!=", &fn_notequal);
   create_builtin("=", &fn_equal);
+  create_builtin("<", &fn_less);
+  create_builtin(">", &fn_greater);
+  create_builtin("<=", &fn_lesseq);
+  create_builtin(">=", &fn_greatereq);
   create_builtin("cons?", &fn_consp);
   create_builtin("sym?", &fn_symp);
   create_builtin("mint?", &fn_mintp);
@@ -56,6 +66,49 @@ setup_builtins() {
   create_builtin("print", &fn_print);
   create_builtin("eval", &fn_eval);
   create_builtin("apply", &fn_apply);
+}
+
+obj_t
+op_cond(obj_t args) {
+  obj_t cond;
+  while (!nullp(cond = car(args))) {
+    if (!nullp(eval(cond)))
+      return eval(car(cdr(args)));
+    args = cdr(cdr(args));
+  }
+  return nil;
+}
+
+obj_t
+op_nand(obj_t args) {
+  return nullp(op_and(args))? t : nil;
+}
+
+obj_t
+op_nor(obj_t args) {
+  return nullp(op_or(args))? t : nil;
+}
+
+obj_t
+op_and(obj_t args) {
+  obj_t ret = t;
+  while (!nullp(args)) {
+    if (nullp(ret = eval(car(args))))
+      return nil;
+    args = cdr(args);
+  }
+  return ret;
+}
+
+obj_t 
+op_or(obj_t args) {
+  obj_t ret = nil;
+  while (!nullp(args)) {
+    if (!nullp(ret = eval(car(args))))
+      return ret;
+    args = cdr(args);
+  }
+  return nil;
 }
 
 obj_t
@@ -153,6 +206,83 @@ op_lambda(obj_t args) {
   func_t *fun = malloc(sizeof(func_t));
   fun->f = make_interp(as_cons(args));
   return make_func(fun);
+}
+
+obj_t
+fn_greatereq(obj_t args) {
+  if (nullp(args)) return t;
+
+  obj_t item = car(args);
+  if (!mintp(item))
+    error(E_INVALID_ARG, item);
+
+  while (!nullp(args = cdr(args))) {
+    if (!mintp(car(args)))
+      error(E_INVALID_ARG, item);
+    if (!(as_mint(item) >= as_mint(car(args))))
+      return nil;
+    item = car(args);
+  }
+  return t;
+}
+
+obj_t
+fn_lesseq(obj_t args) {
+  if (nullp(args)) return t;
+
+  obj_t item = car(args);
+  if (!mintp(item))
+    error(E_INVALID_ARG, item);
+
+  while (!nullp(args = cdr(args))) {
+    if (!mintp(car(args)))
+      error(E_INVALID_ARG, item);
+    if (!(as_mint(item) <= as_mint(car(args))))
+      return nil;
+    item = car(args);
+  }
+  return t;
+}
+
+obj_t
+fn_greater(obj_t args) {
+  if (nullp(args)) return t;
+
+  obj_t item = car(args);
+  if (!mintp(item))
+    error(E_INVALID_ARG, item);
+
+  while (!nullp(args = cdr(args))) {
+    if (!mintp(car(args)))
+      error(E_INVALID_ARG, item);
+    if (!(as_mint(item) > as_mint(car(args))))
+      return nil;
+    item = car(args);
+  }
+  return t;
+}
+
+obj_t
+fn_less(obj_t args) {
+  if (nullp(args)) return t;
+
+  obj_t item = car(args);
+  if (!mintp(item))
+    error(E_INVALID_ARG, item);
+
+  while (!nullp(args = cdr(args))) {
+    if (!mintp(car(args)))
+      error(E_INVALID_ARG, item);
+    if (!(as_mint(item) < as_mint(car(args))))
+      return nil;
+    item = car(args);
+  }
+  return t;
+}
+
+obj_t
+fn_notequal(obj_t args) {
+  return nullp(fn_equal(args))? t : nil;
 }
 
 obj_t
