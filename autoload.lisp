@@ -1,14 +1,34 @@
-(set defmacro (mu (name arglist . body)
-  (list 'set name (list 'mu arglist (cons 'do body)))))
+;; Defmacro and defun both come in ! and !less variants;
+;;  the difference is that the ! version creates a constant
+;;  that cannot be reassigned, probably only good for builtins.
+(def defmacro!
+    (mu (name arglist . body)
+	(list 'def name
+	      (apply list 'mu arglist body))))
+(defmacro! defmacro (name arglist . body)
+  (list 'set name
+	(apply list 'mu arglist body)))
 
-(defmacro defun (name arglist . body)
-  (list 'set name (list 'lambda arglist (cons 'do body))))
+(defmacro! defun! (name arglist . body)
+  (list 'def name (apply list 'lambda arglist body)))
+
+(defmacro! defun (name arglist . body)
+  (list 'def name (apply list 'lambda arglist body)))
+
+(defmacro! if (cnd thn els)
+  (list 'cond cnd thn t els))
+
+(defmacro! when (cnd . thn)
+  (list 'cond cnd (cons 'do thn)))
+
+(defmacro! unless (cnd . thn)
+  (list 'cond cnd nil t (cons 'do thn)))
 
 (defun every-other (lst)
   (if (null? lst) nil
       (cons (car lst) (every-other (cdr (cdr lst))))))
 
-(defmacro let (bindings . body)
+(defmacro! let (bindings . body)
   (cons (list 'lambda (every-other bindings)
 	      (cons 'do body))
 	(every-other (cdr bindings))))
@@ -30,5 +50,14 @@
       (f (car xs)
 	 (foldr f start (cdr xs)))))
 
+(defun filter (f xs)
+  (cond
+    (null? xs) nil
+    (f (car xs)) (cons (car xs)
+		       (filter f (cdr xs)))
+    t (filter f (cdr xs))))
+
 (defun reverse (lst)
   (foldl cons nil lst))
+
+(apply printnl '(Finished loading standard library.))
