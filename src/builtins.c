@@ -38,8 +38,6 @@ setup_builtins() {
   create_special_form("do", &op_do);
   create_special_form("and", &op_and);
   create_special_form("or", &op_or);
-  create_special_form("nand", &op_nand);
-  create_special_form("nor", &op_nor);
 
   create_builtin("!=", &fn_notequal);
   create_builtin("=", &fn_equal);
@@ -67,7 +65,6 @@ setup_builtins() {
   create_builtin("print", &fn_print);
   create_builtin("printnl", &fn_printnl);
   create_builtin("eval", &fn_eval);
-  create_builtin("apply", &fn_apply);
 }
 
 obj_t
@@ -79,16 +76,6 @@ op_cond(obj_t args) {
     args = cdr(cdr(args));
   }
   return nil;
-}
-
-obj_t
-op_nand(obj_t args) {
-  return nullp(op_and(args))? t : nil;
-}
-
-obj_t
-op_nor(obj_t args) {
-  return nullp(op_or(args))? t : nil;
 }
 
 obj_t
@@ -121,32 +108,6 @@ fn_eval(obj_t args) {
     args = cdr(args);
   }
   return ret;
-}
-
-
-obj_t
-dottify(obj_t args) {
-  if (!consp(cdr(args))) return car(args);
-  return cons(car(args), dottify(cdr(args)));
-}
-
-obj_t interpret_function(cons_t*, obj_t, bool);
-obj_t
-fn_apply(obj_t args) {
-  obj_t fun = car(args);
-  args = dottify(cdr(args));
-
-  if (!funcp(fun)) error(E_NO_FUNCTION, fun);
-  func_t *f = as_func(fun);
-  switch (getftype(f)) {
-  case FTYPE_COMPILED:
-    return as_compiled(f)(args);
-  case FTYPE_INTERP:
-    return interpret_function(as_interp(f), args, false);
-  default:
-    error(E_INVALID_ARG, fun);
-    return nil;
-  }
 }
 
 

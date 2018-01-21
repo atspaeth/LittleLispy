@@ -115,7 +115,7 @@ unbind_list(obj_t names) {
 obj_t
 eval_list(obj_t list) {
   if (!consp(list))
-    return nil;
+    return eval(list);
   else
     return cons(eval(car(list)), eval_list(cdr(list)));
 }

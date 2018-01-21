@@ -4,16 +4,16 @@
 (def defmacro!
     (mu (name arglist . body)
 	(list 'def name
-	      (apply list 'mu arglist body))))
+	      (list 'mu arglist . body))))
 (defmacro! defmacro (name arglist . body)
   (list 'set name
-	(apply list 'mu arglist body)))
+	(list 'mu arglist . body)))
 
 (defmacro! defun! (name arglist . body)
-  (list 'def name (apply list 'lambda arglist body)))
+  (list 'def name (list 'lambda arglist . body)))
 
 (defmacro! defun (name arglist . body)
-  (list 'def name (apply list 'lambda arglist body)))
+  (list 'def name (list 'lambda arglist . body)))
 
 (defmacro! if (cnd thn els)
   (list 'cond cnd thn t els))
@@ -60,4 +60,5 @@
 (defun reverse (lst)
   (foldl cons nil lst))
 
-(apply printnl '(Finished loading standard library.))
+(let (words '(Finished loading standard library))
+  (printnl . words))
