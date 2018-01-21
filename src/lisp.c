@@ -58,7 +58,8 @@ sym_t *
 bind_sym(sym_t *sym, obj_t val) {
 
   // prevent assigning to nil
-  if (nullp(make_sym(sym))) return as_sym(nil);
+  if (nullp(make_sym(sym)))
+    return as_sym(nil);
 
   // prevent assigning to constants
   if (consp(sym->val) || nullp(sym->val))
@@ -120,23 +121,20 @@ eval_list(obj_t list) {
 }
 
 void
-bind_list(obj_t names, obj_t args, bool eval_first) {
+bind_list(obj_t names, obj_t args) {
   size_t argcount = 0;
   while (consp(names) && consp(args)) {
     obj_t name = car(names);
     obj_t arg = car(args);
     if (symp(name))
-      bind_sym(as_sym(name),
-	       eval_first? eval(arg) : arg);
+      bind_sym(as_sym(name), arg);
     names = cdr(names);
     args = cdr(args);
     argcount ++;
   }
 
-  if (consp(args) && symp(names) && !nullp(names)) {
-    bind_sym(as_sym(names),
-	     eval_first? eval_list(args) : args);
-
+  if (symp(names) && !nullp(names)) {
+    bind_sym(as_sym(names), args);
   }
 
   if (consp(args) || consp(names)) {
@@ -152,12 +150,14 @@ bind_list(obj_t names, obj_t args, bool eval_first) {
   }
 }
 
+obj_t printy(obj_t);
+
 obj_t
-interpret_function(cons_t *lam, obj_t args, bool eval_first) {
+interpret_function(cons_t *lam, obj_t args) {
   obj_t parlist = lam->car;
   obj_t body = lam->cdr;
 
-  bind_list(parlist, args, eval_first);
+  bind_list(parlist, args);
 
   obj_t ret = nil;
   do {
@@ -180,11 +180,11 @@ funcall(obj_t it, obj_t args) {
   case FTYPE_COMPILED: {
     return as_compiled(f)(eval_list(args));
   } case FTYPE_INTERP:
-    return interpret_function(as_interp(f), args, true);
+    return interpret_function(as_interp(f), eval_list(args));
   case FTYPE_SPECIAL:
     return as_compiled(f)(args);
   case FTYPE_MACRO:
-    return eval(interpret_function(as_interp(f), args, false));
+    return eval(interpret_function(as_interp(f), args));
   }
 }
 
@@ -287,6 +287,8 @@ read(FILE *in) {
   if (c == '(') return read_cons(in);
   if (c == '\'')
     return cons(make_sym(intern_name("quote")), cons(read(in), nil));
+  if (c == ';')
+    while ((c = fgetc(in)) != '\n');
 
   ungetc(c, in);
   char *tok = gets_until(in, is_terminating);
@@ -348,6 +350,11 @@ int main() {
       longjmp(errhandler, E_TRY_AGAIN);
     case E_WRONG_ARGCOUNT:
       printf("* WRONG NUMBER OF ARGUMENTS: ");
+      printy(errobj);
+      putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_REDEFINE:
+      printf("* ATTEMPT TO REDEFINE: ");
       printy(errobj);
       putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
