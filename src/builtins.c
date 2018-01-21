@@ -1,4 +1,5 @@
 #include "builtins.h"
+#include "hash.h"
 #include <stdlib.h>
 
 void
@@ -29,11 +30,11 @@ create_special_form(const char *name, builtin_t *func) {
 void
 setup_builtins() {
   create_special_form("cond", &op_cond);
-  create_special_form("if", &op_if);
   create_special_form("quote", &op_quote);
   create_special_form("lambda", &op_lambda);
   create_special_form("mu", &op_mu);
   create_special_form("set", &op_set);
+  create_special_form("def", &op_def);
   create_special_form("do", &op_do);
   create_special_form("and", &op_and);
   create_special_form("or", &op_or);
@@ -64,6 +65,7 @@ setup_builtins() {
 
   create_builtin("err", &fn_error);
   create_builtin("print", &fn_print);
+  create_builtin("printnl", &fn_printnl);
   create_builtin("eval", &fn_eval);
   create_builtin("apply", &fn_apply);
 }
@@ -149,14 +151,24 @@ fn_apply(obj_t args) {
 
 
 void printy(obj_t);
+int putchar(int);
 obj_t
 fn_print(obj_t args) {
+  obj_t ret = nil;
   while (consp(args)) {
-    printy(car(args));
+    printy(ret = car(args));
+    putchar(' ');
     args = cdr(args);
   }
   if (!nullp(args)) printy(args);
-  return nil;
+  return ret;
+}
+
+obj_t
+fn_printnl(obj_t args) {
+  obj_t ret = fn_print(args);
+  putchar('\n');
+  return ret;
 }
 
 
@@ -168,18 +180,6 @@ op_do(obj_t args) {
     args = cdr(args);
   }
   return ret;
-}
-
-obj_t
-op_if(obj_t args) {
-  obj_t cond = car(args);
-  obj_t thn = car(cdr(args));
-  obj_t els = car(cdr(cdr(args)));
-  
-  if (!nullp(eval(cond)))
-    return eval(thn);
-  else
-    return eval(els);
 }
 
 obj_t
@@ -295,16 +295,54 @@ fn_equal(obj_t args) {
   return t;
 }
 
+// defines a constant
 obj_t
-op_set(obj_t args) {
+op_def(obj_t args) {
+  // must have an even number of arguments
+  if (nullp(args) || nullp(cdr(args)))
+    error(E_WRONG_ARGCOUNT, nil);
+  
   obj_t name = car(args);
   obj_t val = eval(car(cdr(args)));
 
-  if (gettype(name) == TYPE_SYM && as_sym(name) != as_sym(nil)) {
-    bind_sym(as_sym(name), val);
+  if (!symp(name) || nullp(name)) {
+    error(E_INVALID_ARG, args);
   }
 
-  if (nullp(cdr(cdr(args)))) return val;
+  sym_t *sym = as_sym(name);
+
+  if (!nullp(sym->val))
+    error(E_REDEFINE, name);
+
+  sym->val = val;
+
+  if (nullp(cdr(cdr(args)))) return name;
+  else return op_set(cdr(cdr(args)));
+}
+
+// mutates an already-extant variable, or creates a mutable variable
+obj_t
+op_set(obj_t args) {
+  // must have an even number of arguments
+  if (nullp(args) || nullp(cdr(args)))
+    error(E_WRONG_ARGCOUNT, nil);
+  
+  obj_t name = car(args);
+  obj_t val = eval(car(cdr(args)));
+
+  if (!symp(name))
+    error(E_INVALID_ARG, name);
+
+  sym_t *sym = as_sym(name);
+
+  if (nullp(sym->val))
+    sym->val = cons(val, nil);
+  else if (consp(sym->val))
+    as_cons(sym->val)->car = val;
+  else
+    error(E_REDEFINE, name);
+
+  if (nullp(cdr(cdr(args)))) return name;
   else return op_set(cdr(cdr(args)));
 }
 

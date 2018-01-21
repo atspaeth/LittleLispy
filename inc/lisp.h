@@ -150,6 +150,7 @@ typedef enum {
   E_WRONG_ARGCOUNT,
   E_INVALID_ARG,
   E_RUNTIMEY,
+  E_REDEFINE,
 } error_t;
 
 void error(error_t, obj_t);
