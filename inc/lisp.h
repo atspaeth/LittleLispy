@@ -142,7 +142,8 @@ sym_t *intern_name(const char *name);
 
 // General utility.
 typedef enum {
-  E_TRY_AGAIN=1,
+  E_ALL_OKAY=0,
+  E_TRY_AGAIN,
   E_READ_ERROR,
   E_END_OF_FILE,
   E_NO_FUNCTION,

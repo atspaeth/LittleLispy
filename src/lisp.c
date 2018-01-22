@@ -121,42 +121,47 @@ eval_list(obj_t list) {
     return cons(eval(car(list)), eval_list(cdr(list)));
 }
 
+obj_t binderrobj;
+
+// generates a binding list to be walked by bind_list
+error_t
+generate_binding_list(obj_t names, obj_t args, obj_t *out) {
+  switch (gettype(names)) {
+  case TYPE_MINT:
+  case TYPE_FUNC:
+    binderrobj = names;
+    return E_INVALID_NAME;
+  case TYPE_SYM:
+    if (nullp(names)) {
+      return nullp(args) ? E_ALL_OKAY : E_FAILED_BIND;}
+    *out = cons(cons(names, args), *out);
+    return E_ALL_OKAY;
+  case TYPE_CONS: {
+    if (!consp(args))
+      return E_FAILED_BIND;
+    error_t ret = generate_binding_list(car(names), car(args), out);
+    return ret? ret: generate_binding_list(cdr(names), cdr(args), out);
+  }}
+}
+
 void
 bind_list(obj_t names, obj_t args) {
-  size_t argcount = 0;
-  obj_t original_names = names, original_args = args;
+  obj_t bindings = nil;
+  error_t err = generate_binding_list(names, args, &bindings);
 
-  // bind the one-to-one names with args
-  while (consp(names) && consp(args)) {
-    obj_t name = car(names);
-    obj_t arg = car(args);
-    if (symp(name))
-      bind_sym(as_sym(name), arg);
-    else if (consp(name))
-      bind_list(name, arg);
-    else
-      error(E_INVALID_NAME, name);
-    names = cdr(names);
-    args = cdr(args);
-    argcount ++;
-  }
+  if (err == E_FAILED_BIND) binderrobj = cons(names, args);
+  if (err) error(err, binderrobj);
 
-  // if the names were a dotted list, bind its
-  //  last element as a "rest parameter"
-  if (symp(names) && !nullp(names)) {
-    bind_sym(as_sym(names), args);
-  } else if (consp(names)) {
-    unbind_list(original_names);
-    error(E_FAILED_BIND, cons(original_names, original_args));
-  } else if (consp(args)) {
-    do 
-      argcount ++;
-    while (consp(args = cdr(args)));
+  while (!nullp(bindings)) {
+    obj_t name = car(car(bindings));
+    obj_t val = cdr(car(bindings));
 
-    unbind_list(original_names);
-    error(E_WRONG_ARGCOUNT, make_mint(argcount));
+    bind_sym(as_sym(name), val);
+
+    bindings = cdr(bindings);
   }
 }
+
 
 obj_t printy(obj_t);
 
@@ -396,6 +401,7 @@ int main() {
       printy(car(errobj));
       printf(" <-> ");
       printy(cdr(errobj));
+      putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
     case E_INVALID_NAME:
       printf("* NAME NOT A SYMBOL: ");
