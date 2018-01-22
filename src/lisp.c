@@ -124,7 +124,7 @@ eval_list(obj_t list) {
 void
 bind_list(obj_t names, obj_t args) {
   size_t argcount = 0;
-  obj_t original_names = names;
+  obj_t original_names = names, original_args = args;
 
   // bind the one-to-one names with args
   while (consp(names) && consp(args)) {
@@ -132,6 +132,10 @@ bind_list(obj_t names, obj_t args) {
     obj_t arg = car(args);
     if (symp(name))
       bind_sym(as_sym(name), arg);
+    else if (consp(name))
+      bind_list(name, arg);
+    else
+      error(E_INVALID_NAME, name);
     names = cdr(names);
     args = cdr(args);
     argcount ++;
@@ -143,7 +147,7 @@ bind_list(obj_t names, obj_t args) {
     bind_sym(as_sym(names), args);
   } else if (consp(names)) {
     unbind_list(original_names);
-    error(E_WRONG_ARGCOUNT, make_mint(argcount));
+    error(E_FAILED_BIND, cons(original_names, original_args));
   } else if (consp(args)) {
     do 
       argcount ++;
@@ -368,7 +372,7 @@ int main() {
 	longjmp(errhandler, E_TRY_AGAIN);
       }
     case E_NO_FUNCTION:
-      printf("* UNDEFINED FUNCTION: ");
+      printf("* NOT A FUNCTION: ");
       printy(errobj);
       putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
@@ -384,6 +388,17 @@ int main() {
       longjmp(errhandler, E_TRY_AGAIN);
     case E_WRONG_ARGCOUNT:
       printf("* WRONG NUMBER OF ARGUMENTS: ");
+      printy(errobj);
+      putchar('\n');
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_FAILED_BIND:
+      printf("* BINDING FAILED: ");
+      printy(car(errobj));
+      printf(" <-> ");
+      printy(cdr(errobj));
+      longjmp(errhandler, E_TRY_AGAIN);
+    case E_INVALID_NAME:
+      printf("* NAME NOT A SYMBOL: ");
       printy(errobj);
       putchar('\n');
       longjmp(errhandler, E_TRY_AGAIN);
