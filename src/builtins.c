@@ -31,6 +31,7 @@ void
 setup_builtins() {
   create_special_form("cond", &op_cond);
   create_special_form("quote", &op_quote);
+  create_special_form("quasiquote", &op_quasiquote);
   create_special_form("lambda", &op_lambda);
   create_special_form("mu", &op_mu);
   create_special_form("set", &op_set);
@@ -143,9 +144,40 @@ op_do(obj_t args) {
   return ret;
 }
 
+obj_t eval_list(obj_t);
+
+obj_t
+nappend(obj_t a, obj_t b) {
+  if (consp(a) && !nullp(b)) {
+    if (nullp(cdr(a)))
+      as_cons(a)->cdr = b;
+    else nappend(cdr(a), b);
+  }
+  return a;
+}
+
+obj_t
+op_quasiquote(obj_t args) {
+  if (!consp(args)) return args;
+
+  if (eqp(car(args), unquote))
+    return eval(cdr(args));
+
+  if (eqp(car(car(cdr(args))), unquote_splice)) {
+    return cons(op_quasiquote(car(args)),
+		nappend(eval(cdr(car(cdr(args)))),
+			op_quasiquote(cdr(cdr(args)))));
+  }
+		
+		
+
+  return cons(op_quasiquote(car(args)),
+	      op_quasiquote(cdr(args)));
+}
+
 obj_t
 op_quote(obj_t args) {
-  return car(args);
+  return args;
 }
 
 obj_t

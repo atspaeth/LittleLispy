@@ -11,6 +11,7 @@
 // nil will be redefined in init code, but some of that code depends
 //  on nil having some (any) value; the mint 0 has been chosen arbitrarily
 obj_t nil=(obj_t)0L, t;
+obj_t quote, quasiquote, unquote, unquote_splice;
 symt_t *symtable;
 
 obj_t 
@@ -123,6 +124,9 @@ eval_list(obj_t list) {
 void
 bind_list(obj_t names, obj_t args) {
   size_t argcount = 0;
+  obj_t original_names = names;
+
+  // bind the one-to-one names with args
   while (consp(names) && consp(args)) {
     obj_t name = car(names);
     obj_t arg = car(args);
@@ -133,20 +137,20 @@ bind_list(obj_t names, obj_t args) {
     argcount ++;
   }
 
+  // if the names were a dotted list, bind its
+  //  last element as a "rest parameter"
   if (symp(names) && !nullp(names)) {
     bind_sym(as_sym(names), args);
-  }
+  } else if (consp(names)) {
+    unbind_list(original_names);
+    error(E_WRONG_ARGCOUNT, make_mint(argcount));
+  } else if (consp(args)) {
+    do 
+      argcount ++;
+    while (consp(args = cdr(args)));
 
-  if (consp(args) || consp(names)) {
-    while (consp(args)) {
-	argcount ++;
-	args = cdr(args);
-    }
-
-    if (consp(names)) {
-	unbind_list(names);
-	error(E_WRONG_ARGCOUNT, make_mint(argcount));
-    }
+    unbind_list(original_names);
+    error(E_WRONG_ARGCOUNT, make_mint(argcount));
   }
 }
 
@@ -209,7 +213,17 @@ printy(obj_t arg) {
   case TYPE_SYM:
     printf("%s", as_sym(arg)->key); break;
   case TYPE_FUNC:
-    printf("<function>"); break;
+    switch(getftype(as_func(arg))) {
+    case FTYPE_COMPILED:
+      printf("<C function>"); break;
+    case FTYPE_INTERP:
+      printf("<function>"); break;
+    case FTYPE_MACRO:
+      printf("<macro>"); break;
+    case FTYPE_SPECIAL:
+      printf("<special form>"); break;
+    }
+    break;
   case TYPE_CONS:
     putchar('(');
     printy(car(arg));
@@ -265,7 +279,7 @@ gets_until(FILE *in, bool(*pred)(char)) {
 
 bool
 is_terminating(char c) {
-  return c=='(' || c==')' || c==',' || isspace(c);
+  return c=='(' || c==')' || isspace(c);
 }
 
 obj_t
@@ -282,13 +296,29 @@ read(FILE *in) {
 
   while (isspace(c = fgetc(in)));
 
-  if (c == EOF) error(E_END_OF_FILE, nil);
-  if (c == ')') error(E_READ_ERROR, nil);
-  if (c == '(') return read_cons(in);
-  if (c == '\'')
-    return cons(make_sym(intern_name("quote")), cons(read(in), nil));
-  if (c == ';')
+  switch (c) {
+  case EOF:
+    error(E_END_OF_FILE, nil);
+  case ')':
+    error(E_READ_ERROR, nil);
+  case '(':
+    return read_cons(in);
+  case '\'':
+    return cons(quote, read(in));
+  case '`':
+    return cons(quasiquote, read(in));
+  case ',':
+    if ((c = fgetc(in)) == '@') 
+      return cons(unquote_splice, read(in));
+    else {
+      ungetc(c, in);
+      return cons(unquote, read(in));
+    }
+  case ';':
     while ((c = fgetc(in)) != '\n');
+  default: ;
+    // fall through to finish reading
+  }
 
   ungetc(c, in);
   char *tok = gets_until(in, is_terminating);
@@ -306,6 +336,10 @@ int main() {
   symtable = symt_create(128);
   nil = make_sym(make_self_evaluating("nil"));
   t = make_sym(make_self_evaluating("t"));
+  quote = make_sym(intern_name("quote"));
+  quasiquote = make_sym(intern_name("quasiquote"));
+  unquote = make_sym(intern_name("unquote"));
+  unquote_splice = make_sym(intern_name("unquote-splice"));
 
   setup_builtins();
 
