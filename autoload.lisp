@@ -3,36 +3,37 @@
 ;;  that cannot be reassigned, probably only good for builtins.
 (def defmacro!
     (mu (name arglist . body)
-	(list 'def name
-	      (list 'mu arglist . body))))
+	`(def ,name (mu ,arglist . ,body))))
+
 (defmacro! defmacro (name arglist . body)
-  (list 'set name
-	(list 'mu arglist . body)))
+  `(set ,name (mu ,arglist . ,body)))
 
 (defmacro! defun! (name arglist . body)
-  (list 'def name (list 'lambda arglist . body)))
+  `(def ,name (lambda ,arglist . ,body)))
 
 (defmacro! defun (name arglist . body)
-  (list 'def name (list 'lambda arglist . body)))
+  `(def ,name (lambda ,arglist . ,body)))
 
 (defmacro! if (cnd thn els)
-  (list 'cond cnd thn t els))
+  `(cond ,cnd ,thn t ,els))
 
 (defmacro! when (cnd . thn)
-  (list 'cond cnd (cons 'do thn)))
+  `(cond ,cnd (do . ,thn)))
 
 (defmacro! unless (cnd . thn)
-  (list 'cond cnd nil t (cons 'do thn)))
-
-(defun every-other (lst)
-  (if (null? lst) nil
-      (cons (car lst) (every-other (cdr (cdr lst))))))
+  `(cond ,cnd nil t (do . ,thn)))
 
 (defmacro! let (bindings . body)
-  (cons (list 'lambda (every-other bindings)
-	      (cons 'do body))
-	(every-other (cdr bindings))))
+  ((lambda (every-other)
+     `((lambda ,(every-other bindings)
+	 (do . ,body))
+       ,@(every-other (cdr bindings))))
+   (lambda (lst)
+     (if (null? lst) nil
+	 (cons (car lst) (every-other (cdr (cdr lst))))))))
 
+(defun! atom? (x)
+  (null? (cons? x)))
 
 (defun map (f xs)
   (if (null? xs) nil
@@ -40,25 +41,30 @@
 	    (map f (cdr xs)))))
 
 (defun foldl (f acc xs)
-  (if (null? xs)
+  (if (atom? xs)
       acc
       (foldl f (f (car xs) acc) (cdr xs))))
 
 (defun foldr (f start xs)
-  (if (null? xs)
+  (if (atom? xs)
       start
       (f (car xs)
 	 (foldr f start (cdr xs)))))
 
 (defun filter (f xs)
   (cond
-    (null? xs) nil
+    (atom? xs) nil
     (f (car xs)) (cons (car xs)
 		       (filter f (cdr xs)))
     t (filter f (cdr xs))))
 
 (defun reverse (lst)
   (foldl cons nil lst))
+
+(defun range (start end)
+  (cond (= start end) (list end)
+	(< start end) (cons start (range (+ start 1) end))
+	(> start end) (cons start (range (- start 1) end))))
 
 (let (words '(Finished loading standard library))
   (printnl . words))
