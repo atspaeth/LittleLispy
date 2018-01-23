@@ -292,39 +292,44 @@ fn_equal(obj_t args) {
 obj_t
 op_def(obj_t args) {
   // must have an even number of arguments
-  if (nullp(args) || nullp(cdr(args)))
-    error(E_WRONG_ARGCOUNT, nil);
+  if (!listp(args)) return args;
+  if (!listp(cdr(args)))
+    error(E_FAILED_BIND, cons(cons(car(args), nil), cdr(args)));
   
   obj_t name = car(args);
   obj_t val = eval(car(cdr(args)));
 
-  if (!symp(name) || nullp(name)) {
-    error(E_INVALID_ARG, args);
-  }
+  if (!symp(name))
+    error(E_INVALID_NAME, name);
+  if (nullp(name))
+    error(E_REDEFINE, name);
 
   sym_t *sym = as_sym(name);
 
   if (!nullp(sym->val))
     error(E_REDEFINE, name);
-
-  sym->val = val;
+  else
+    sym->val = val;
 
   if (nullp(cdr(cdr(args)))) return name;
-  else return op_set(cdr(cdr(args)));
+  else return op_def(cdr(cdr(args)));
 }
 
 // mutates an already-extant variable, or creates a mutable variable
 obj_t
 op_set(obj_t args) {
   // must have an even number of arguments
-  if (nullp(args) || nullp(cdr(args)))
-    error(E_WRONG_ARGCOUNT, nil);
+  if (!listp(args)) return nil;
+  if (!listp(cdr(args)))
+    error(E_FAILED_BIND, cons(cons(car(args), nil), cdr(args)));
   
   obj_t name = car(args);
   obj_t val = eval(car(cdr(args)));
 
   if (!symp(name))
-    error(E_INVALID_ARG, name);
+    error(E_INVALID_NAME, name);
+  if (nullp(name))
+    error(E_REDEFINE, name);
 
   sym_t *sym = as_sym(name);
 

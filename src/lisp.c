@@ -45,27 +45,14 @@ name_value(key_t name) {
   return sym_value(intern_name(name));
 }
 
-obj_t 
-cons(obj_t car, obj_t cdr) {
-  cons_t *cons = malloc(sizeof(cons_t));
-  if (!cons) die();
-
-  cons->car = car;
-  cons->cdr = cdr;
-  return make_cons(cons);
-}
-
 sym_t *
 bind_sym(sym_t *sym, obj_t val) {
 
-  // prevent assigning to nil
-  if (nullp(make_sym(sym)))
-    return as_sym(nil);
+  // prevent assigning to nil or constants
+  if (nullp(make_sym(sym)) || !listp(sym->val))
+    error(E_REDEFINE, make_sym(sym));
 
-  // prevent assigning to constants
-  if (consp(sym->val) || nullp(sym->val))
-    sym->val = cons(val, sym->val);
-
+  sym->val = cons(val, sym->val);
   return sym;
 }
 
@@ -163,8 +150,6 @@ bind_list(obj_t names, obj_t args) {
 }
 
 
-obj_t printy(obj_t);
-
 obj_t
 interpret_function(cons_t *lam, obj_t args) {
   obj_t parlist = lam->car;
@@ -214,6 +199,16 @@ eval(obj_t it) {
   }
 }
 
+bool stringp(obj_t str) {
+  while (consp(str)) {
+    if (!mintp(car(str)) || !isprint(as_mint(car(str))))
+      return false;
+    str = cdr(str);
+  }
+  if (!nullp(str)) return false;
+  return true;
+}
+
 obj_t
 printy(obj_t arg) {
   switch (gettype(arg)) {
@@ -234,17 +229,28 @@ printy(obj_t arg) {
     }
     break;
   case TYPE_CONS:
-    putchar('(');
-    printy(car(arg));
-    while (consp(arg = cdr(arg))) {
-      putchar(' ');
+    if (stringp(arg)) {
+      putchar('"');
+      while (consp(arg)) {
+	if (mintp(car(arg)) && isprint(as_mint(car(arg))))
+	  putchar(as_mint(car(arg)));
+	arg = cdr(arg);
+      }
+      putchar('"');
+    } else {
+      putchar('(');
       printy(car(arg));
+      while (consp(arg = cdr(arg))) {
+	putchar(' ');
+	printy(car(arg));
+      }
+      if (!nullp(arg)) {
+	printf(" . ");
+	printy(arg);
+      }
+      putchar(')');
     }
-    if (!nullp(arg)) {
-      printf(" . ");
-      printy(arg);
-    }
-    putchar(')');
+    break;
   }
   return nil;
 }
@@ -285,7 +291,6 @@ gets_until(FILE *in, bool(*pred)(char)) {
   return buf;
 }
 
-
 bool
 is_terminating(char c) {
   return c=='(' || c==')' || isspace(c);
@@ -297,6 +302,26 @@ read_mint(char *str) {
   mint_t x = strtol(str, &endptr, 0);
   if (!*endptr) return make_mint(x);
   else return nil;
+}
+
+obj_t
+read_string(FILE *in) {
+  obj_t ret = cons(quote, nil);
+  obj_t ptr = ret;
+  int c;
+  bool backslashed = false;
+  while ((c = fgetc(in)) != EOF) {
+    if (!backslashed && c == '"') break;
+
+    if (c == '\\')
+      backslashed = true;
+    else
+      backslashed = false;
+
+    as_cons(ptr)->cdr = cons(make_mint(c), nil);
+    ptr = cdr(ptr);
+  }
+  return ret;
 }
 
 obj_t
@@ -323,6 +348,8 @@ read(FILE *in) {
       ungetc(c, in);
       return cons(unquote, read(in));
     }
+  case '"':
+    return read_string(in);
   case ';':
     while ((c = fgetc(in)) != '\n');
   default: ;

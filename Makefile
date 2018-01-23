@@ -34,7 +34,7 @@ $(TARGET) : $(GENFILES) $(OFILES)
 	@echo '*~' >> .gitignore
 
 run : all
-	./$(TARGET)
+	rlwrap ./$(TARGET)
 
 clean: 
 	@for file in $(GENERATED) ; do [ -f $$file ] && rm $$file || true ; done

@@ -123,6 +123,8 @@ static inline bool eqp(obj_t a, obj_t b) {
   return a._bits == b._bits;}
 static inline bool nullp(obj_t a) {
   return a._bits == nil._bits;}
+static inline bool listp(obj_t obj) {
+  return consp(obj) || nullp(obj);}
 
 obj_t cons(obj_t car, obj_t cdr);
 obj_t car(obj_t cons);
